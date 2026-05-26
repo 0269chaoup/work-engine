@@ -1,15 +1,18 @@
 import { Command } from "commander";
+import fs from "fs";
+import path from "path";
 import { buildContext, row } from "../lib/cli-utils.js";
 import {
   createWorkFile,
   validateWork,
-  generateIndex,
   archiveProject,
   generateReport,
   fixWorkFrontmatter,
   normalizeWorkFiles,
   createTaskNote,
 } from "../lib/work.js";
+import { scanWorkFilesAST, aggregateByProject } from "../lib/aggregator.js";
+import { renderIndex, renderRootIndex } from "../lib/template.js";
 
 export function workCommand(): Command {
   const work = new Command("work")
@@ -85,19 +88,61 @@ export function workCommand(): Command {
   // ── work index ──────────────────────────────────────────────────────────
   work
     .command("index")
-    .description("Generate/update INDEX.md for each project")
+    .description("Generate/update MOC-enhanced INDEX.md for each project")
     .option("-p, --project <name>", "Limit to a specific project")
     .action(async (opts) => {
       const ctx = buildContext(work.parent!.opts());
+      const WORK_DIR = "30-Projects/Work";
 
-      console.log("\n📋 Generating project indexes...\n");
-      const results = await generateIndex(ctx.vault.root, {
-        project: opts.project,
-      });
+      console.log("\n📋 Generating MOC indexes...\n");
 
-      for (const r of results) {
-        console.log(`  📁 ${r.project}: ${r.fileCount} files → ${r.filePath}`);
+      // AST parse → aggregate → render
+      const files = await scanWorkFilesAST(ctx.vault.root);
+      const filtered = opts.project
+        ? files.filter(f => f.project === opts.project)
+        : files;
+
+      const projects = aggregateByProject(filtered);
+      const results: { project: string; filePath: string; fileCount: number }[] = [];
+
+      for (const [name, agg] of projects) {
+        const indexDir = name === "General"
+          ? path.resolve(ctx.vault.root, WORK_DIR)
+          : path.resolve(ctx.vault.root, WORK_DIR, name);
+
+        if (!fs.existsSync(indexDir)) {
+          fs.mkdirSync(indexDir, { recursive: true });
+        }
+
+        const indexPath = path.join(indexDir, "INDEX.md");
+        const content = renderIndex(agg);
+        fs.writeFileSync(indexPath, content, "utf-8");
+
+        results.push({
+          project: name,
+          filePath: path.relative(ctx.vault.root, indexPath),
+          fileCount: agg.totalFiles,
+        });
+
+        const pct = Math.round(agg.completionRate * 100);
+        const blocked = agg.blockedItems.length > 0
+          ? ` | ⛔ ${agg.blockedItems.length} blocked`
+          : "";
+        console.log(
+          `  📁 ${name}: ${agg.totalFiles} files | ✅ ${pct}%${blocked} → ${path.relative(ctx.vault.root, indexPath)}`
+        );
       }
+
+      // Root INDEX.md
+      if (!opts.project) {
+        const rootIndexPath = path.resolve(ctx.vault.root, WORK_DIR, "INDEX.md");
+        const rootContent = renderRootIndex(
+          results.map(r => ({ name: r.project, fileCount: r.fileCount }))
+        );
+        fs.writeFileSync(rootIndexPath, rootContent, "utf-8");
+        console.log(`\n  📄 Root INDEX.md updated`);
+      }
+
       console.log(`\n✅ Updated ${results.length} project index(es).`);
     });
 
@@ -192,7 +237,7 @@ export function workCommand(): Command {
 >   - [ ] 待办任务
 
 使用方式：
-  wiki-engine work task create <项目> <标题> --group "任务组名"
+  work-engine work task create <项目> <标题> --group "任务组名"
 `);
     });
 

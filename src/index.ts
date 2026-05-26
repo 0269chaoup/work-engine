@@ -15,6 +15,10 @@ program
     "vault root directory",
     process.env.OBSIDIAN_VAULT ?? process.cwd()
   )
+  .option("--llm <provider>", "LLM provider: api | agent", "api")
+  .option("--api-provider <name>", "API provider: anthropic | openai", "anthropic")
+  .option("--model <name>", "LLM model name")
+  .option("--api-key <key>", "API key (or set ANTHROPIC_AUTH_TOKEN / OPENAI_API_KEY)")
   .option("--verbose", "verbose output", false);
 
 program.addCommand(workCommand());
