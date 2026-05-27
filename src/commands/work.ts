@@ -13,6 +13,18 @@ import {
 } from "../lib/work.js";
 import { scanWorkFilesAST, aggregateByProject } from "../lib/aggregator.js";
 import { renderIndex, renderRootIndex } from "../lib/template.js";
+import {
+  ensureDiary,
+  appendEvent,
+  findTaskFile,
+  findTaskFileGlobal,
+  readTaskInfo,
+  relativeToVault,
+  toWikilink,
+  formatTime,
+  EVENT_ICONS,
+  formatEventLine,
+} from "../lib/diary-bridge.js";
 
 export function workCommand(): Command {
   const work = new Command("work")
@@ -361,6 +373,53 @@ export function workCommand(): Command {
       console.log(
         `Total: ${report.totalFiles} files across ${report.totalProjects} projects`
       );
+    });
+
+  // ── work log ──────────────────────────────────────────────────────────────
+  work
+    .command("log")
+    .description("Append a log entry to today's diary, optionally linked to a work task")
+    .argument("<message>", "Log message")
+    .option("-p, --project <name>", "Project name (for linking to a task)")
+    .option("-t, --task <title>", "Task title (for linking)")
+    .option("--date <date>", "Date (YYYY-MM-DD), default: today")
+    .option("--icon <icon>", "Event icon", "📝")
+    .option("--tag <tag>", "Additional tag (repeatable)", (val: string, prev: string[]) => [...prev, val], [] as string[])
+    .action((message, opts) => {
+      const ctx = buildContext(work.parent!.opts());
+      const now = new Date();
+      const date = opts.date ? new Date(opts.date + "T00:00:00") : now;
+
+      // Find task if specified
+      const links: string[] = [];
+      if (opts.task) {
+        const absPath = opts.project
+          ? findTaskFile(ctx.vault.root, opts.project, opts.task)
+          : findTaskFileGlobal(ctx.vault.root, opts.task);
+
+        if (absPath) {
+          const task = readTaskInfo(ctx.vault.root, absPath);
+          if (task) {
+            links.push(task.wikilink);
+          }
+        } else {
+          console.warn(`⚠️  Task not found: ${opts.task}`);
+        }
+      }
+
+      // Append event to diary
+      const tags = ["#log", ...opts.tag];
+      const diaryPath = appendEvent(ctx.vault.root, date, {
+        time: formatTime(now),
+        icon: opts.icon,
+        description: message,
+        links,
+        tags,
+      });
+
+      const relDiary = relativeToVault(ctx.vault.root, diaryPath);
+      console.log(`\n📝 Log entry added to ${relDiary}`);
+      console.log(`   ${formatEventLine({ time: formatTime(now), icon: opts.icon, description: message, links, tags })}\n`);
     });
 
   return work;

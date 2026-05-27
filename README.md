@@ -31,6 +31,12 @@ work-engine --vault ~/Documents/obsidian_cache work normalize
 
 # Project status report
 work-engine --vault ~/Documents/obsidian_cache work report
+
+# Log an entry to today's diary
+work-engine --vault ~/Documents/obsidian_cache work log "完成了架构设计"
+
+# Log with task link
+work-engine --vault ~/Documents/obsidian_cache work log "开始编码" -p MyProject -t "Architecture Design"
 ```
 
 ## Commands
@@ -45,6 +51,7 @@ work-engine --vault ~/Documents/obsidian_cache work report
 | `work archive <project>` | Archive project (compact TechNotes into post-mortem) | No |
 | `work task create/template` | Task callout management | No |
 | `work report` | Project status report — overview of all projects | No |
+| `work log <message>` | Append a log entry to today's diary, optionally linked to a task | No |
 
 ## File Structure
 
