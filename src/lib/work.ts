@@ -33,6 +33,7 @@
  *    - fixWorkFrontmatter():  修复缺失/错误的 frontmatter
  *    - normalizeWorkFiles():  全面规范化工作文件
  *    - generateReport():      生成项目状态报告
+ *    - updateTaskStatus():    更新任务文件的 status 字段
  *
  * 4. 辅助函数：
  *    - parseWorkFile():       解析单个工作文件的 frontmatter（带容错）
@@ -1299,5 +1300,65 @@ export async function generateReport(
     totalProjects: byProject.size,
     projects,
     orphanFiles: orphans,
+  };
+}
+
+// ── Update Status ───────────────────────────────────────────────────────────
+
+/**
+ * 更新任务文件的 status 字段
+ *
+ * 根据项目名和标题查找任务文件，修改其 frontmatter 中的 status 字段并写回磁盘。
+ *
+ * @param vaultRoot - Vault 根目录
+ * @param project   - 项目名称
+ * @param title     - 任务标题（文件名，不含 .md 后缀）
+ * @param newStatus - 新状态值（如 "🍂 Completed"）
+ * @returns 更新结果：旧状态、新状态、文件路径、标题；如果文件未找到返回 null
+ */
+export function updateTaskStatus(
+  vaultRoot: string,
+  project: string,
+  title: string,
+  newStatus: string,
+): { oldStatus: string; newStatus: string; filePath: string; title: string } | null {
+  /** 确定项目目录 */
+  const projectDir =
+    project === "General"
+      ? path.resolve(vaultRoot, WORK_DIR)
+      : path.resolve(vaultRoot, WORK_DIR, project);
+
+  /** 将标题中的文件系统不允许的字符替换为下划线（与 createWorkFile 保持一致） */
+  const safeName = title.replace(/[<>:"\/\\|?*]/g, "_");
+  const filePath = path.join(projectDir, `${safeName}.md`);
+
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const raw = fs.readFileSync(filePath, "utf-8");
+  let data: Record<string, unknown>;
+  let content: string;
+
+  try {
+    const parsed = matter(raw);
+    data = parsed.data;
+    content = parsed.content;
+  } catch {
+    return null;
+  }
+
+  const oldStatus = (data.status as string) ?? "";
+  data.status = newStatus;
+  const newRaw = matter.stringify(content, data);
+  fs.writeFileSync(filePath, newRaw, "utf-8");
+
+  const fileTitle = (data.title as string) ?? title;
+
+  return {
+    oldStatus,
+    newStatus,
+    filePath: path.relative(vaultRoot, filePath),
+    title: fileTitle,
   };
 }

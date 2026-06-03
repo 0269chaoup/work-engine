@@ -35,6 +35,7 @@ import {
   fixWorkFrontmatter,
   normalizeWorkFiles,
   createTaskNote,
+  updateTaskStatus,
 } from "../lib/work.js";
 import { scanWorkFilesAST, aggregateByProject } from "../lib/aggregator.js";
 import { renderIndex, renderRootIndex } from "../lib/template.js";
@@ -657,6 +658,77 @@ export function workCommand(): Command {
       const relDiary = relativeToVault(ctx.vault.root, diaryPath);
       console.log(`\n📝 Log entry added to ${relDiary}`);
       console.log(`   ${formatEventLine({ time: formatTime(now), icon: opts.icon, description: message, links, tags })}\n`);
+    });
+
+  // ── work status ────────────────────────────────────────────────────────────
+  /**
+   * 子命令：work status
+   * 功能：更新任务文件的 status 字段，状态变更为 completed 时自动写入日记
+   *
+   * 参数：
+   *   project — 项目名称
+   *   title   — 任务标题
+   *   status  — 新状态值（支持简写：planned/active/blocked/completed/archived）
+   *
+   * 特性：
+   *   - 状态变更为 "🍂 Completed" 时，自动在当日日记追加完成事件
+   *   - 事件格式：`- HH:MM ✅ 完成 [[任务wikilink]] #task`
+   */
+  /** 状态简写映射表 */
+  const STATUS_SHORTCUTS: Record<string, string> = {
+    planned: "🌱 Planned",
+    active: "🌿 Active",
+    blocked: "🚧 Blocked",
+    completed: "🍂 Completed",
+    archived: "🗃️ Archived",
+  };
+
+  work
+    .command("status")
+    .description("Update task status; auto-logs to diary on completion")
+    .argument("<project>", "Project name")
+    .argument("<title>", "Task title")
+    .argument("<status>", "New status (planned | active | blocked | completed | archived)")
+    .action((project, title, statusArg) => {
+      const ctx = buildContext(work.parent!.opts());
+
+      /** 解析状态值：支持简写和完整写法 */
+      const newStatus = STATUS_SHORTCUTS[statusArg.toLowerCase()] ?? statusArg;
+
+      /** 校验状态值 */
+      const validStatuses = Object.values(STATUS_SHORTCUTS);
+      if (!validStatuses.includes(newStatus)) {
+        console.error(`\n❌ Invalid status: "${statusArg}"`);
+        console.error(`   Valid values: ${Object.keys(STATUS_SHORTCUTS).join(" | ")}`);
+        return;
+      }
+
+      /** 更新任务状态 */
+      const result = updateTaskStatus(ctx.vault.root, project, title, newStatus);
+      if (!result) {
+        console.error(`\n❌ Task not found: ${project}/${title}`);
+        return;
+      }
+
+      console.log(`\n📋 ${result.title}`);
+      console.log(`   ${result.oldStatus || "(none)"} → ${result.newStatus}`);
+
+      /** 状态变更为 completed 时，自动写入日记 */
+      if (newStatus === "🍂 Completed") {
+        const now = new Date();
+        /** 构建 wikilink：使用 [[title]] 格式 */
+        const wikilink = `[[${result.title}]]`;
+        const diaryPath = appendEvent(ctx.vault.root, now, {
+          time: formatTime(now),
+          icon: "✅",
+          description: `完成 ${wikilink}`,
+          links: [],
+          tags: ["#task"],
+        });
+        const relDiary = relativeToVault(ctx.vault.root, diaryPath);
+        console.log(`\n📝 Diary: ${relDiary}`);
+        console.log(`   ${formatEventLine({ time: formatTime(now), icon: "✅", description: `完成 ${wikilink}`, links: [], tags: ["#task"] })}`);
+      }
     });
 
   return work;
