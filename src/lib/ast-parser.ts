@@ -161,7 +161,7 @@ export function parseWorkFileAST(
    *   5. 按空白字符分词，统计非空词数
    */
   const plainText = content
-    .replace(/[>#`\-\[]()|*_~]/g, "")
+    .replace(/[>#` \-[\]()|*_~]/g, "")
     .replace(/!\[\[.*?\]\]/g, "")  // 图片
     .replace(/\[\[.*?\]\]/g, "")    // wikilinks
     .replace(/https?:\/\/\S+/g, "") // URLs

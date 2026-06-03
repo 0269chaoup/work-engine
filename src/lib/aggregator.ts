@@ -109,7 +109,7 @@ const WORK_DIR = "30-Projects/Work";
 /**
  * 扫描并解析所有工作文件
  *
- * 使用 glob 模式匹配 30-Projects/Work/**/*.md，
+ * 使用 glob 模式匹配 30-Projects/Work 下所有 .md 文件（递归），
  * 排除系统目录（.obsidian, .git, .trash, node_modules）和 INDEX.md，
  * 然后逐个调用 parseWorkFileAST() 进行 AST 解析。
  *

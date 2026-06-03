@@ -623,18 +623,23 @@ export function workCommand(): Command {
          * - 指定了项目：在该项目目录下精确查找
          * - 未指定项目：在所有项目中全局搜索
          */
-        const absPath = opts.project
-          ? findTaskFile(ctx.vault.root, opts.project, opts.task)
-          : findTaskFileGlobal(ctx.vault.root, opts.task);
-
-        if (absPath) {
-          /** 读取任务文件信息，获取 wikilink 用于日志关联 */
-          const task = readTaskInfo(ctx.vault.root, absPath);
-          if (task) {
-            links.push(task.wikilink);
+        if (opts.project) {
+          /** 指定了项目：精确查找，返回 string | null */
+          const absPath = findTaskFile(ctx.vault.root, opts.project, opts.task);
+          if (absPath) {
+            const task = readTaskInfo(ctx.vault.root, absPath);
+            if (task) links.push(task.wikilink);
+          } else {
+            console.warn(`⚠️  Task not found: ${opts.task}`);
           }
         } else {
-          console.warn(`⚠️  Task not found: ${opts.task}`);
+          /** 未指定项目：全局搜索，返回 TaskInfo | null（已含 wikilink） */
+          const task = findTaskFileGlobal(ctx.vault.root, opts.task);
+          if (task) {
+            links.push(task.wikilink);
+          } else {
+            console.warn(`⚠️  Task not found: ${opts.task}`);
+          }
         }
       }
 

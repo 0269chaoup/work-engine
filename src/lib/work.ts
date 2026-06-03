@@ -327,7 +327,7 @@ function parseWorkFile(
 /**
  * 扫描并解析所有工作文件（轻量级版本）
  *
- * 使用 glob 匹配 30-Projects/Work/**/*.md，
+ * 使用 glob 匹配 30-Projects/Work 下所有 .md 文件（递归），
  * 排除系统目录后逐个解析 frontmatter。
  *
  * @param vaultRoot - Vault 根目录
